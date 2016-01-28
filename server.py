@@ -5,8 +5,10 @@ import struct
 import sys
 import numpy as np
 
-host="127.0.0.1"
-port="5555"
+print "Entrez l'adresse du serveur"
+host=raw.input()
+print "Entrez le port du serveur"
+port=raw.input()
 
 #Creation de la socket
 
@@ -16,7 +18,7 @@ mySocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
 	mySocket.connect((host,port)
 except mySocket.error:
-	print " la connexion a ecouhe."
+	print " connexion failed"
     sys.exit()
 print "Connexion établie"
 
@@ -44,4 +46,40 @@ While True:
         maisons = []
         for i in range(n):
             maisons.append((struct.unpack('=B', self._s.recv(1))[0] for i in range(2)))
-		
+
+	 elif order == "HME":
+        x, y = (struct.unpack('=B', self._s.recv(1))[0] for i in range(2))
+		card[x][y]=1
+
+    elif order == "UPD":
+        n = struct.unpack('=B', self._s.recv(1))[0]
+        changes = []
+        for i in range(n):
+            changes.append((struct.unpack('=B', self._s.recv(1))[0] for i in range(5)))
+
+        #mettez à jour votre carte à partir des tuples contenus dans changes
+        #calculez votre coup
+        #préparez la trame MOV ou ATK
+        #Par exemple:
+        send(sock, "MOV", 1,2,1,1,3)
+
+    elif order == "MAP":
+        n = struct.unpack('=B', self._s.recv(1))[0]
+        changes = []
+        for i in range(n):
+            changes.append((struct.unpack('=B', self._s.recv(1))[0] for i in range(
+        #initialisez votre carte à partir des tuples contenus dans changes
+
+    elif order == "END":
+        #ici on met fin à la partie en cours
+        #Réinitialisez votre modèle
+
+    elif order == "BYE":
+        break
+    else:
+        print("commande non attendue recue", order)
+
+#Préparez ici la déconnexion
+
+#Fermeture de la socket
+    sock.close()

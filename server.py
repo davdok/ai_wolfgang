@@ -5,84 +5,98 @@ import struct
 import sys
 import numpy as np
 
+#Le script va prendre en ligne de commande le port et l'adresse IP
+
 def send(sock, *messages):
-    """Send a given set of messages to the server."""
-	for message in messages:
-		try:
-            data = struct.pack('=B', message) if isinstance(message, int) else message
+    for message in messages:
+        try:
+            if isinstance(message, int):
+                data = struct.pack('=B', message)
+            elif isinstance(message,str):
+                data = message.encode()
+            else:
+                data = message
             sock.send(data)
-	except:
-		print("Couldn't send message: ", message)
-			
-print "Entrez l'adresse du serveur"
-host=raw.input()
-print "Entrez le port du serveur"
-port=raw.input()
+        except:
+            print("Couldn't send message: ", message)
 
-#Creation de la socket
 
-mySocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-#Connexion
+#Création de la socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+#Connexion de la socket
 try:
-	mySocket.connect((host,port)
-except mySocket.error:
-	print " connexion failed"
-    sys.exit()
-print "Connexion établie"
+    sock.connect(("127.0.0.1", 5555)) #Changez ici l'adresse ip et le port
+except Exception as error:
+    print("Connection error: ", error)
 
 #Envoi du nom
-
-groupName ="Wolfgang"
-send(mySocket, "NME", len(groupName), groupName)
+groupname = "Wolfgang" #mettez ici le nom de votre équipe
+send(sock, "NME", len(groupname), groupname)
 
 #Main Loop
+test = 0
+while True:
+    order = sock.recv(3)
+    print('test')
+    order = order.decode(encoding = 'utf8')
 
-While True:
-       order = mySocket.recv(3)
-
-    if not data:
+    if not order:
         print("Bizarre, c'est vide")
 
     if order =="SET":
-        lignes, colonnes = (struct.unpack('=B', self._s.recv(1))[0] for i in range(2))
-		card = np.eye(colonnes,lignes)
-		for i in range(len(card)):
-			card[i]=0
+        print('set')
+        lignes = struct.unpack('=B',sock.recv(1))[0]
+        colonnes = struct.unpack('=B',sock.recv(1))[0]
 
-	elif order == "HUM":
-        n = struct.unpack('=B', self._s.recv(1))[0]
+    elif order == "HUM":
+        print('hum')
+        n = struct.unpack('=B', sock.recv(1))[0]
         maisons = []
         for i in range(n):
-            maisons.append((struct.unpack('=B', self._s.recv(1))[0] for i in range(2)))
+            x = struct.unpack('=B',sock.recv(1))[0]
+            y = struct.unpack('=B',sock.recv(1))[0]
+            maisons.append((x,y))
 
-	 elif order == "HME":
-        x, y = (struct.unpack('=B', self._s.recv(1))[0] for i in range(2))
-		card[x][y]=1
-
+            
+    elif order == "HME":
+        print('hme')
+        x = struct.unpack('=B',sock.recv(1))[0]
+        y = struct.unpack('=B',sock.recv(1))[0]
+        print(x,y)
+        #ajoutez le code ici (x,y) étant les coordonnées de votre
+        #maison
     elif order == "UPD":
-        n = struct.unpack('=B', self._s.recv(1))[0]
+        print('upd')
+        n = struct.unpack('=B', sock.recv(1))[0]
         changes = []
         for i in range(n):
-            changes.append((struct.unpack('=B', self._s.recv(1))[0] for i in range(5)))
-
+            for i in range(5):
+                changes.append(struct.unpack('=B', sock.recv(1))[0])
+        print(changes)
         #mettez à jour votre carte à partir des tuples contenus dans changes
         #calculez votre coup
         #préparez la trame MOV ou ATK
         #Par exemple:
-        send(sock, "MOV", 1,2,1,1,3)
-
+        test += 1
+        if test%2 ==0:
+            send(sock, "MOV", 1,3,3,1,4,3)
+        else:
+            send(sock, "MOV", 1,4,3,1,3,3)
     elif order == "MAP":
-        n = struct.unpack('=B', self._s.recv(1))[0]
+        print('map')
+        n = struct.unpack('=B', sock.recv(1))[0]
         changes = []
         for i in range(n):
-            changes.append((struct.unpack('=B', self._s.recv(1))[0] for i in range(
+            for i in range(5):
+                changes.append(struct.unpack('=B', sock.recv(1))[0])
+        print(changes)
         #initialisez votre carte à partir des tuples contenus dans changes
-
     elif order == "END":
+        break
         #ici on met fin à la partie en cours
         #Réinitialisez votre modèle
-
     elif order == "BYE":
         break
     else:
@@ -91,4 +105,4 @@ While True:
 #Préparez ici la déconnexion
 
 #Fermeture de la socket
-    sock.close()
+sock.close()

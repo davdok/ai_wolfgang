@@ -35,6 +35,29 @@ except Exception as error:
 groupname = "Wolfgang" #mettez ici le nom de votre équipe
 send(sock, "NME", len(groupname), groupname)
 
+
+
+
+#-------------------------------------------------------------------------------------------------------
+# AI
+
+def set_positions(changes):
+    positions = {'humans':{},'vampires':{},'wolves':{}}
+    for i in range(len(changes)):
+        if changes[i] != 0 and (i==2 or i%5 ==2):
+            positions['humans'][(changes[i-2],changes[i-1])] = changes[i]
+        if changes[i] != 0 and (i==3 or i%5 ==3):
+            positions['vampires'][(changes[i-3],changes[i-2])] = changes[i]
+        if changes[i] != 0 and (i==4 or i%5 ==4):
+            positions['wolves'][(changes[i-4],changes[i-3])] = changes[i]
+    print(positions)
+    return positions
+
+def update_positions(old,new):
+    for species in new:
+        return "ok"
+
+
 #Main Loop
 test = 0
 while True:
@@ -59,7 +82,7 @@ while True:
             y = struct.unpack('=B',sock.recv(1))[0]
             maisons.append((x,y))
 
-            
+
     elif order == "HME":
         print('hme')
         x = struct.unpack('=B',sock.recv(1))[0]
@@ -67,14 +90,16 @@ while True:
         print(x,y)
         #ajoutez le code ici (x,y) étant les coordonnées de votre
         #maison
-    elif order == "UPD":
+    elif order == "UPD":    
         print('upd')
         n = struct.unpack('=B', sock.recv(1))[0]
         changes = []
         for i in range(n):
             for i in range(5):
                 changes.append(struct.unpack('=B', sock.recv(1))[0])
-        print(changes)
+
+        new_positions = set_positions(changes)
+
         #mettez à jour votre carte à partir des tuples contenus dans changes
         #calculez votre coup
         #préparez la trame MOV ou ATK
@@ -91,7 +116,12 @@ while True:
         for i in range(n):
             for i in range(5):
                 changes.append(struct.unpack('=B', sock.recv(1))[0])
-        print(changes)
+
+        positions = set_positions(changes)
+
+
+
+
         #initialisez votre carte à partir des tuples contenus dans changes
     elif order == "END":
         break

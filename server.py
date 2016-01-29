@@ -42,20 +42,35 @@ send(sock, "NME", len(groupname), groupname)
 # AI
 
 def set_positions(changes):
-    positions = {'humans':{},'vampires':{},'wolves':{}}
-    for i in range(len(changes)):
-        if changes[i] != 0 and (i==2 or i%5 ==2):
-            positions['humans'][(changes[i-2],changes[i-1])] = changes[i]
-        if changes[i] != 0 and (i==3 or i%5 ==3):
-            positions['vampires'][(changes[i-3],changes[i-2])] = changes[i]
-        if changes[i] != 0 and (i==4 or i%5 ==4):
-            positions['wolves'][(changes[i-4],changes[i-3])] = changes[i]
-    print(positions)
-    return positions
+    states = {'humans':{},'me':{},'enemy':{}}
+    abscence = []
+    changes = [changes[5*n:5*n+5] for n in range(int(len(changes)/5))]
+    for change in changes:
+        position = (change[0],change[1])
+        if change[2] != 0:
+            states['humans'][position] = change[2]
+        elif change[3] != 0:
+            states['me'][position] = change[3]
+        elif change[4] != 0:
+            states['enemy'][position] = change[4]
+        else:
+            abscence += [position]
+    return states,abscence
 
-def update_positions(old,new):
-    for species in new:
-        return "ok"
+def update_positions(old_position,new_position):
+    updated = old_position
+    new = new_position[0]
+    absence = new_position[1]
+    print(absence)
+    for species in new.keys():
+        for position in new[species].keys():
+            updated[species][position] = new[species][position]
+        for position in list(updated[species]):
+            if position in absence:
+                updated[species].pop(position)
+
+
+    return updated
 
 
 #Main Loop
@@ -98,7 +113,8 @@ while True:
             for i in range(5):
                 changes.append(struct.unpack('=B', sock.recv(1))[0])
 
-        new_positions = set_positions(changes)
+        print(changes)
+        
 
         #mettez à jour votre carte à partir des tuples contenus dans changes
         #calculez votre coup
@@ -109,6 +125,12 @@ while True:
             send(sock, "MOV", 1,3,3,1,4,3)
         else:
             send(sock, "MOV", 1,4,3,1,3,3)
+
+        new_positions = set_positions(changes)
+        states = update_positions(states,new_positions)
+        print(states)
+
+
     elif order == "MAP":
         print('map')
         n = struct.unpack('=B', sock.recv(1))[0]
@@ -117,7 +139,7 @@ while True:
             for i in range(5):
                 changes.append(struct.unpack('=B', sock.recv(1))[0])
 
-        positions = set_positions(changes)
+        states = set_positions(changes)[0]
 
 
 

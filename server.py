@@ -5,6 +5,15 @@ import struct
 import sys
 import numpy as np
 
+def send(sock, *messages):
+    """Send a given set of messages to the server."""
+	for message in messages:
+		try:
+            data = struct.pack('=B', message) if isinstance(message, int) else message
+            sock.send(data)
+	except:
+		print("Couldn't send message: ", message)
+			
 print "Entrez l'adresse du serveur"
 host=raw.input()
 print "Entrez le port du serveur"

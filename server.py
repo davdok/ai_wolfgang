@@ -72,6 +72,30 @@ def update_positions(old_position,new_position):
 
     return updated
 
+def possible_move(x,y,a,b,positions,lignes,colonnes):
+    impossible = list(positions['humans'])
+    impossible += list(positions['enemy'])
+    if (a==0 and b ==0) or x+a<0 or x+a>=colonnes or y+b<0 or y+b>= lignes or (x+a,y+b) in impossible:
+        return False
+    else:
+        return True
+
+from random import randint
+
+def ai_random_move(x,y,positions,lignes,colonnes):
+    a = 0
+    b = 0
+    while possible_move(x,y,a,b,positions,lignes,colonnes) == False:
+        a = randint(-1,1)
+        b = randint(-1,1)
+    print("mouvement de {0} {1}".format(a,b))
+    print(x,y)
+    print(a,b)
+    print(x+a,y+b)
+    return (x+a,y+b)
+
+
+import time 
 
 #Main Loop
 test = 0
@@ -87,6 +111,8 @@ while True:
         print('set')
         lignes = struct.unpack('=B',sock.recv(1))[0]
         colonnes = struct.unpack('=B',sock.recv(1))[0]
+        print('size')
+        print(lignes,colonnes)
 
     elif order == "HUM":
         print('hum')
@@ -120,15 +146,32 @@ while True:
         #calculez votre coup
         #préparez la trame MOV ou ATK
         #Par exemple:
-        test += 1
-        if test%2 ==0:
-            send(sock, "MOV", 1,3,3,1,4,3)
-        else:
-            send(sock, "MOV", 1,4,3,1,3,3)
-
+        
         new_positions = set_positions(changes)
         states = update_positions(states,new_positions)
-        print(states)
+        
+        groups = states['me'].items()
+        for group in groups:
+            x,y=group[0]
+            size = randint(1,group[1])
+            xnew,ynew=x,y
+            while((xnew,ynew) in list(states['me'])):
+                newmove = ai_random_move(x,y,states,lignes,colonnes)
+                xnew,ynew = newmove[0],newmove[1]
+            send(sock,"MOV",1,x,y,size,xnew,ynew)
+
+
+
+        '''
+        newmove = ai_random_move(x,y,states,lignes,colonnes)
+        xnew=newmove[0]
+        ynew=newmove[1] 
+        send(sock, "MOV", 1,x,y,1,xnew,ynew)
+        x,y = xnew,ynew'''
+        time.sleep(1.5)
+
+
+        
 
 
     elif order == "MAP":

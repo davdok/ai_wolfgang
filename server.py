@@ -3,7 +3,13 @@
 import socket
 import struct
 import sys
-import numpy as np
+import numpy as np          #rajouté
+import time                 #rajouté
+from random import randint  #rajouté
+
+
+#-------------------------------------------------------------------------------------------------------
+# Connexion au serveur
 
 #Le script va prendre en ligne de commande le port et l'adresse IP
 
@@ -38,13 +44,30 @@ send(sock, "NME", len(groupname), groupname)
 
 
 
+
 #-------------------------------------------------------------------------------------------------------
 # AI
 
+
+def attente(secondes = 0.5):
+    '''Fonction d'attente pour que les mouvements soient perceptibles'''
+    time.sleep(secondes)
+
+def distance(node1,node2):
+    '''Renvoie la distance entre deux points, c'est à dire le nombre de coups nécessaires pour aller d'un point à l'autre'''
+    x1,y1 = node1
+    x2,y2 = node2 
+    return max([abs(y2-y1),abs(x2-x1)])
+
 def set_positions(changes):
+    '''Permet de prendre une liste des changements (ou positions initiales) et construit le dictionnaire d'état des positions'''
+    #Dictionnaire vide
     states = {'humans':{},'me':{},'enemy':{}}
-    abscence = []
+    #Stocke les cases qui sont devenues vides
+    absence = []
+    #Coupe l'ensemble des changements en une liste de changements
     changes = [changes[5*n:5*n+5] for n in range(int(len(changes)/5))]
+    #Itération sur chaque changement, et attribution de la position à chaque espèce
     for change in changes:
         position = (change[0],change[1])
         if change[2] != 0:
@@ -54,35 +77,45 @@ def set_positions(changes):
         elif change[4] != 0:
             states['enemy'][position] = change[4]
         else:
-            abscence += [position]
-    return states,abscence
+            absence += [position]
+    return states,absence
 
 def update_positions(old_position,new_position):
-    updated = old_position
-    new = new_position[0]
-    absence = new_position[1]
-    print(absence)
+    '''Met à jour le dictionnaire d'état des positions avec les changements à chaque tour
+       Prend en compte les changements de case et les attaques de groupes'''
+    updated = old_position      #Anciennes positions
+    new = new_position[0]       #Nouvelles positions
+    absence = new_position[1]   #Absences 
+
+    #Itération sur chaque espèce
     for species in new.keys():
+
+        #Construction des positions des autres espèces pour vérifier que telle espèce ne s'est pas fait tuée
+        other_species = [list(new[x].keys()) for x in ['humans','me','enemy'] if x!=species]
+        other_species = [x for y in other_species for x in y]
+
+        #Pour chaque nouvelle position on met à jour le dictionnaire des positions
         for position in new[species].keys():
             updated[species][position] = new[species][position]
+
+        #Pour chaque position finale, on vérifie que cette position n'est pas sensée avoir disparue (case vide) ou si l'espèce n'est pas morte
         for position in list(updated[species]):
-            if position in absence:
+            if position in absence or position in other_species:
                 updated[species].pop(position)
-
-
     return updated
 
 def possible_move(x,y,a,b,positions,lignes,colonnes):
+    '''Booléen vrai si un mouvement x->x+a y->y+b est possible (borne du terrain,immobile,déjà quelqu'un sur la case)'''    
     impossible = list(positions['humans'])
     impossible += list(positions['enemy'])
+    impossible += list(positions['me'])
     if (a==0 and b ==0) or x+a<0 or x+a>=colonnes or y+b<0 or y+b>= lignes or (x+a,y+b) in impossible:
         return False
     else:
         return True
 
-from random import randint
-
-def ai_random_move(x,y,positions,lignes,colonnes):
+def random_move(x,y,positions,lignes,colonnes):
+    '''Définit un mouvement aléatoire dans une case valide'''
     a = 0
     b = 0
     while possible_move(x,y,a,b,positions,lignes,colonnes) == False:
@@ -95,13 +128,97 @@ def ai_random_move(x,y,positions,lignes,colonnes):
     return (x+a,y+b)
 
 
-import time 
+#--------------------------------------------------------------------------------------------------------------
+# Fonctions d'Intelligences Artificielles
+
+
+def ai_random_move_group(positions):
+    '''Intelligence Artificielle qui déplace de manière aléatoire un ou plusieurs individus'''
+    print('AI Random Move Group')
+    groups = positions['me'].items()
+    for group in groups:
+        x,y=group[0]
+        size = randint(1,group[1])
+        xnew,ynew=x,y
+        newmove = random_move(x,y,positions,lignes,colonnes)
+        xnew,ynew = newmove[0],newmove[1]
+        send(sock,"MOV",1,x,y,size,xnew,ynew)
+    attente()
+
+def ai_random_move_block(positions):
+    '''Intelligence Artificielle qui déplace de manière aléatoire l'ensemble du groupe'''
+    print('AI Random Move Block')
+    group = list(positions['me'].items())[0]
+    x,y = group[0]
+    size = group[1]
+    newmove = random_move(x,y,positions,lignes,colonnes)
+    xnew,ynew = newmove[0],newmove[1]
+    send(sock, "MOV", 1,x,y,size,xnew,ynew)
+    attente()
+
+def ai_weakest_attack_move(positions):
+    '''Intelligence artificielle pour attaquer tout le monde (humains et ennemis) par ordre de faiblesse'''
+    print('AI weakeast attack move')
+    humans = list(positions['humans'].items())
+    humans += list(positions['enemy'].items()) #à supprimer pour ne pas attaquer les ennemis 
+
+    nb_villages = len(humans)
+    #village = list(humans.items())[randint(0,nb_villages-1)]
+    if nb_villages > 0:
+        village = min(humans,key = lambda t:t[1]) 
+        xh,yh = village[0][0],village[0][1]
+        sizeh = village[1]
+
+        group = list(positions['me'].items())[0]
+        x,y = group[0]
+        size = group[1]
+
+        if size > sizeh:
+            print('Attacking the village')
+            while abs(xh-x)>=1 and abs(yh-y)>=1:
+                xnew = x+1 if x<xh else x-1
+                ynew = y+1 if y<yh else y-1
+                send(sock,"MOV",1,x,y,size,xnew,ynew)
+                x,y = xnew,ynew
+            while abs(xh-x)>=1:
+                xnew = x+1 if x<xh else x-1
+                ynew = y
+                send(sock,"MOV",1,x,y,size,xnew,ynew)
+                x,y = xnew,ynew
+            while abs(yh-y)>=1:
+                xnew = x
+                ynew = y+1 if y<yh else y-1
+                send(sock,"MOV",1,x,y,size,xnew,ynew)
+                x,y = xnew,ynew
+            attente()
+
+        else:
+            print('Not attacking the village, too small')
+    else:
+        print('No more human villages')
+
+
+def ai_closest_attack_move(positions):
+    '''Attaque les ennemis les plus proches s'il est possible de les attaquer'''
+    return True
+
+
+
+
+
+
+
+#-------------------------------------------------------------------------------------------------------
+
+
+
 
 #Main Loop
 test = 0
 while True:
     order = sock.recv(3)
-    print('test')
+    print('--------------------------------------------------------------------------------')
+    print('New loop')
     order = order.decode(encoding = 'utf8')
 
     if not order:
@@ -113,7 +230,6 @@ while True:
         colonnes = struct.unpack('=B',sock.recv(1))[0]
         print('size')
         print(lignes,colonnes)
-
     elif order == "HUM":
         print('hum')
         n = struct.unpack('=B', sock.recv(1))[0]
@@ -122,8 +238,6 @@ while True:
             x = struct.unpack('=B',sock.recv(1))[0]
             y = struct.unpack('=B',sock.recv(1))[0]
             maisons.append((x,y))
-
-
     elif order == "HME":
         print('hme')
         x = struct.unpack('=B',sock.recv(1))[0]
@@ -142,37 +256,18 @@ while True:
         print(changes)
         
 
-        #mettez à jour votre carte à partir des tuples contenus dans changes
-        #calculez votre coup
-        #préparez la trame MOV ou ATK
-        #Par exemple:
         
+        '''Mise à jour des positions avec les changements du tour précédent'''
         new_positions = set_positions(changes)
-        states = update_positions(states,new_positions)
+        positions = update_positions(positions,new_positions)
         
-        groups = states['me'].items()
-        for group in groups:
-            x,y=group[0]
-            size = randint(1,group[1])
-            xnew,ynew=x,y
-            while((xnew,ynew) in list(states['me'])):
-                newmove = ai_random_move(x,y,states,lignes,colonnes)
-                xnew,ynew = newmove[0],newmove[1]
-            send(sock,"MOV",1,x,y,size,xnew,ynew)
+        '''Intelligence Artificielle'''
+        ''' - Choisir une des intelligences artificielles ci-dessous pour tester'''
+        ai_weakest_attack_move(positions)
+        #ai_random_move_group(positions)
+        #ai_random_move_block(positions)
 
-
-
-        '''
-        newmove = ai_random_move(x,y,states,lignes,colonnes)
-        xnew=newmove[0]
-        ynew=newmove[1] 
-        send(sock, "MOV", 1,x,y,1,xnew,ynew)
-        x,y = xnew,ynew'''
-        time.sleep(1.5)
-
-
-        
-
+        print(positions)
 
     elif order == "MAP":
         print('map')
@@ -182,7 +277,7 @@ while True:
             for i in range(5):
                 changes.append(struct.unpack('=B', sock.recv(1))[0])
 
-        states = set_positions(changes)[0]
+        positions = set_positions(changes)[0]
 
 
 

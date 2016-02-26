@@ -3,6 +3,7 @@
 import socket
 import struct
 import sys
+import os
 import numpy as np          #rajouté
 import time                 #rajouté
 from random import randint  #rajouté
@@ -31,9 +32,16 @@ def send(sock, *messages):
 #Création de la socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+#Reception IP et PORT en ligne de commande
+ip = sys.argv[(len(sys.argv)-2)]
+port = sys.argv[(len(sys.argv)-1)]
+#Test version locale
+#ip="127.0.0.1"
+#port=5555
+
 #Connexion de la socket
 try:
-    sock.connect(("127.0.0.1", 5555)) #Changez ici l'adresse ip et le port
+    sock.connect((ip, port)) #Changez ici l'adresse ip et le port
 except Exception as error:
     print("Connection error: ", error)
 
@@ -114,6 +122,16 @@ def possible_move(x,y,a,b,positions,lignes,colonnes):
     else:
         return True
 
+def possible_attack(me,enemy):
+    '''Fonction basique pour calculer si la victoire est assurée'''
+    group = positions['me'].items()[1]
+    opponent = positions['enemy'].items()[1]
+    if group >= 1.5*opponent:
+        return True
+    else:
+        return False
+
+
 def random_move(x,y,positions,lignes,colonnes):
     '''Définit un mouvement aléatoire dans une case valide'''
     a = 0
@@ -126,6 +144,7 @@ def random_move(x,y,positions,lignes,colonnes):
     print(a,b)
     print(x+a,y+b)
     return (x+a,y+b)
+
 
 
 #--------------------------------------------------------------------------------------------------------------
@@ -200,11 +219,46 @@ def ai_weakest_attack_move(positions):
 
 def ai_closest_attack_move(positions):
     '''Attaque les ennemis les plus proches s'il est possible de les attaquer'''
-    return True
+    print ('AI Closest attack move')
+    humans = list(positions['humans'].items())
+    humans += list(positions['enemy'].items()) #à supprimer pour ne pas attaquer les ennemis 
 
+    nb_villages = len(humans)
+    village = list(humans.items())[randint(0,nb_villages-1)]
+    group = list(positions['me'].items())[0]
+    x,y = group[0]
+    size = group[1]
 
+    for village in villages:
+        dist = {}
+        dist += distance(group,village)
 
+    dist_min = min(dist)
+    closest_village = dist['dist_min']
 
+    xh,yh = closest_village[0][0],closest_village[0][1]
+
+    if possible_attack(group,closest_village[1]):
+         print('Attacking the village')
+            while abs(xh-x)>=1 and abs(yh-y)>=1:
+                xnew = x+1 if x<xh else x-1
+                ynew = y+1 if y<yh else y-1
+                send(sock,"MOV",1,x,y,size,xnew,ynew)
+                x,y = xnew,ynew
+            while abs(xh-x)>=1:
+                xnew = x+1 if x<xh else x-1
+                ynew = y
+                send(sock,"MOV",1,x,y,size,xnew,ynew)
+                x,y = xnew,ynew
+            while abs(yh-y)>=1:
+                xnew = x
+                ynew = y+1 if y<yh else y-1
+                send(sock,"MOV",1,x,y,size,xnew,ynew)
+                x,y = xnew,ynew
+            attente()
+
+        else:
+            print('I may loose')
 
 
 
